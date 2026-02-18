@@ -252,6 +252,7 @@ async def process(
     token = uuid4().hex
     REPORT_STORE[token] = out_path
 
+    accounts = sorted({r.account_id for r in rows})
     return templates.TemplateResponse(
         "preview.html",
         {
@@ -260,6 +261,7 @@ async def process(
             "warnings": warnings,
             "download_url": f"/download/{token}",
             "year": year,
+            "accounts": accounts,
         },
     )
 
