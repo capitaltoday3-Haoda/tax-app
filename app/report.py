@@ -10,6 +10,8 @@ class SummaryRow:
     symbol: str
     symbol_name: str
     currency: str
+    proceeds: float
+    cost_total: float
     gain: float
     loss: float
     net: float
@@ -42,6 +44,8 @@ def build_workbook(
             "Symbol",
             "Name",
             "Currency",
+            "Sell Proceeds",
+            "Cost Total",
             "Realized Gain",
             "Realized Loss",
             "Net (Gain-Loss)",
@@ -61,6 +65,8 @@ def build_workbook(
                 r.symbol,
                 r.symbol_name,
                 r.currency,
+                r.proceeds,
+                r.cost_total,
                 r.gain,
                 r.loss,
                 r.net,

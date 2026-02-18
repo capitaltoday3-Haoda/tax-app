@@ -40,6 +40,8 @@
           <th>Symbol</th>
           <th>Name</th>
           <th>Currency</th>
+          <th>Sell Proceeds</th>
+          <th>Cost Total</th>
           <th>Realized Gain</th>
           <th>Realized Loss</th>
           <th>Net</th>
@@ -58,6 +60,8 @@
           <td>{{ r.symbol }}</td>
           <td>{{ r.symbol_name }}</td>
           <td>{{ r.currency }}</td>
+          <td>{{ '%.2f'|format(r.proceeds) }}</td>
+          <td>{{ '%.2f'|format(r.cost_total) }}</td>
           <td>{{ '%.2f'|format(r.gain) }}</td>
           <td>{{ '%.2f'|format(r.loss) }}</td>
           <td>{{ '%.2f'|format(r.net) }}</td>

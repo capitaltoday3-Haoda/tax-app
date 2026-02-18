@@ -14,6 +14,8 @@ class Lot:
 class Realized:
     gain: float = 0.0
     loss: float = 0.0
+    proceeds: float = 0.0
+    cost: float = 0.0
 
 
 @dataclass
@@ -27,6 +29,11 @@ def _add_realized(realized: Realized, amount: float) -> None:
         realized.gain += amount
     else:
         realized.loss += -amount
+
+
+def _add_proceeds_cost(realized: Realized, proceeds: float, cost: float) -> None:
+    realized.proceeds += proceeds
+    realized.cost += cost
 
 
 def compute_realized(
@@ -63,6 +70,7 @@ def compute_realized(
             take = min(remaining, lot.qty)
             if target_year is None or trade.trade_date.year == target_year:
                 _add_realized(realized[sym], (trade.price - lot.cost) * take)
+                _add_proceeds_cost(realized[sym], trade.price * take, lot.cost * take)
             lot.qty -= take
             remaining -= take
             if lot.qty <= 1e-9:
@@ -84,6 +92,7 @@ def compute_realized(
                 fallback = 0.0
             if target_year is None or trade.trade_date.year == target_year:
                 _add_realized(realized[sym], (trade.price - fallback) * remaining)
+                _add_proceeds_cost(realized[sym], trade.price * remaining, fallback * remaining)
             remaining = 0.0
 
     return realized, warnings, missing_cost_symbols, sold_symbols

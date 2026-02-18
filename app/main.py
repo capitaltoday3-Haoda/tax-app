@@ -27,6 +27,7 @@ def index(request: Request):
         "hkd_rate": 0.90322,
         "sgd_rate": 5.4586,
         "rate_date": "2025-12-31",
+        "fee_rate": 0.01,
     }
     return templates.TemplateResponse("index.html", {"request": request, **defaults})
 
@@ -107,6 +108,7 @@ async def process(
     usd_rate: str = Form(""),
     hkd_rate: str = Form(""),
     sgd_rate: str = Form(""),
+    fee_rate: str = Form(""),
     tax_floor_zero: Optional[str] = Form(None),
     target_year: Optional[str] = Form(None),
 ):
@@ -183,6 +185,10 @@ async def process(
 
     avg_costs = _parse_avg_costs(avg_costs_csv)
     rates = _parse_fx_rates(usd_rate, hkd_rate, sgd_rate)
+    try:
+        fee_rate_val = float(fee_rate)
+    except (TypeError, ValueError):
+        fee_rate_val = 0.0
 
     rows: List[SummaryRow] = []
     warnings: List[WarningRow] = []
@@ -251,7 +257,10 @@ async def process(
             if cur is None:
                 cur = ""
             symbol_name = name_map.get(sym, "")
-            net = r.gain - r.loss
+            # Apply fee on proceeds
+            net = (r.proceeds - r.cost) - (fee_rate_val * r.proceeds)
+            gain = net if net >= 0 else 0.0
+            loss = -net if net < 0 else 0.0
             tax_base = net
             tax_due = tax_base * 0.20
             tax_floor = str(tax_floor_zero).lower() in ("true", "on", "1", "yes")
@@ -274,8 +283,10 @@ async def process(
                     symbol=sym,
                     symbol_name=symbol_name,
                     currency=cur,
-                    gain=r.gain,
-                    loss=r.loss,
+                    proceeds=r.proceeds,
+                    cost_total=r.cost,
+                    gain=gain,
+                    loss=loss,
                     net=net,
                     tax_base=tax_base,
                     tax_due=tax_due,
@@ -288,6 +299,8 @@ async def process(
             )
 
     totals = {
+        "proceeds": sum(r.proceeds for r in rows),
+        "cost_total": sum(r.cost_total for r in rows),
         "gain": sum(r.gain for r in rows),
         "loss": sum(r.loss for r in rows),
         "net": sum(r.net for r in rows),
@@ -301,6 +314,8 @@ async def process(
             symbol="",
             symbol_name="汇总",
             currency="",
+            proceeds=totals["proceeds"],
+            cost_total=totals["cost_total"],
             gain=totals["gain"],
             loss=totals["loss"],
             net=totals["net"],

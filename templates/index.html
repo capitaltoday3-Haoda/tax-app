@@ -50,6 +50,10 @@
       </div>
       <div class="note">默认值为 {{ rate_date }} 参考汇率，可自行修改</div>
 
+      <label>交易费率</label>
+      <input type="text" name="fee_rate" value="{{ fee_rate }}" />
+      <div class="note">按比例输入，例如 1% 填 0.01</div>
+
       <label>目标年份</label>
       <input type="text" name="target_year" placeholder="例如：2025" />
       <div class="note">如上传跨年度月结单，请填写目标年份。</div>
