@@ -33,6 +33,7 @@ def compute_realized(
     trades: List[Trade],
     initial_lots: Dict[str, List[Lot]],
     fallback_costs: Dict[str, float],
+    target_year: int | None = None,
 ) -> Tuple[Dict[str, Realized], List[WarningMsg]]:
     positions: Dict[str, List[Lot]] = {sym: list(lots) for sym, lots in initial_lots.items()}
     realized: Dict[str, Realized] = {}
@@ -55,7 +56,8 @@ def compute_realized(
         while remaining > 1e-9 and lots:
             lot = lots[0]
             take = min(remaining, lot.qty)
-            _add_realized(realized[sym], (trade.price - lot.cost) * take)
+            if target_year is None or trade.trade_date.year == target_year:
+                _add_realized(realized[sym], (trade.price - lot.cost) * take)
             lot.qty -= take
             remaining -= take
             if lot.qty <= 1e-9:
@@ -74,7 +76,8 @@ def compute_realized(
                     )
                 )
                 fallback = 0.0
-            _add_realized(realized[sym], (trade.price - fallback) * remaining)
+            if target_year is None or trade.trade_date.year == target_year:
+                _add_realized(realized[sym], (trade.price - fallback) * remaining)
             remaining = 0.0
 
     return realized, warnings

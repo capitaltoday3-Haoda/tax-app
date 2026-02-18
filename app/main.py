@@ -92,6 +92,7 @@ async def process(
     avg_costs_csv: Optional[UploadFile] = File(None),
     fx_rates: str = Form(""),
     tax_floor_zero: Optional[str] = Form(None),
+    target_year: Optional[str] = Form(None),
 ):
     if not statements:
         return templates.TemplateResponse(
@@ -118,13 +119,17 @@ async def process(
         )
 
     years = sorted({y for y, _ in months})
-    if len(years) != 1:
+    year: Optional[int] = None
+    if target_year and target_year.strip().isdigit():
+        year = int(target_year.strip())
+    elif len(years) == 1:
+        year = years[0]
+    else:
         return templates.TemplateResponse(
             "index.html",
-            {"request": request, "error": "检测到多年度月结单，请一次只处理一个年度。"},
+            {"request": request, "error": "检测到多年度月结单，请选择目标年份。"},
             status_code=400,
         )
-    year = years[0]
 
     # Identify earliest month for initial holdings
     month_to_holdings: Dict[Tuple[int, int], List[Holding]] = {}
@@ -162,9 +167,7 @@ async def process(
                 )
             )
 
-    # Filter to target year
-    all_trades = [t for t in all_trades if t.trade_date.year == year]
-    realized, fifo_warnings = compute_realized(all_trades, initial_lots, fallback_costs)
+    realized, fifo_warnings = compute_realized(all_trades, initial_lots, fallback_costs, target_year=year)
     for w in fifo_warnings:
         warnings.append(WarningRow(symbol=w.symbol, message=w.message))
 
