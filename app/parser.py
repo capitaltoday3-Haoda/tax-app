@@ -217,6 +217,9 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
         net_qty = nums[3]
         if net_qty is None:
             continue
+        # Filter to stocks only (skip options)
+        if re.search(r"\d{6,}[CP]\d{4,}", code):
+            continue
         holdings.append(
             Holding(account_id=account_id, symbol=code, currency=currency, qty=float(net_qty), name=name)
         )
@@ -318,6 +321,9 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
             qty = _parse_number(row_match.group(5))
             price = _parse_number(row_match.group(6))
             currency = row_match.group(2)
+            # Filter to stocks only (skip options)
+            if current_symbol.endswith((".US", ".HK")) or re.search(r"\d{6,}[CP]\d{4,}", current_symbol):
+                continue
             if trade_date and qty is not None and price is not None:
                 trades.append(
                     Trade(
