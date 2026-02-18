@@ -4,3 +4,4 @@ pdfplumber
 pypdf
 openpyxl
 jinja2
+python-multipart
