@@ -106,6 +106,8 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
     account_id = _huatai_account_id(text)
     month = parse_statement_month(text)
     trades: List[Trade] = []
+    seen_trade_refs: set[str] = set()
+    seen_trade_keys: set[tuple] = set()
 
     # 成交单据
     trade_lines = _extract_section_lines(text, "成交单据", ["户口变动", "持货结存"])
@@ -138,6 +140,11 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
         side = side_map.get(side_cn)
         if side is None:
             continue
+        trade_key = (account_id, _normalize_symbol(code), settle, side, abs(qty), price)
+        if trade_key in seen_trade_keys:
+            continue
+        seen_trade_refs.add(ref)
+        seen_trade_keys.add(trade_key)
         trades.append(
             Trade(
                 account_id=account_id,
@@ -163,6 +170,8 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
     for line in account_lines:
         if "买卖交易" not in line:
             continue
+        if "取消" in line:
+            continue
         match = pattern.search(line)
         if not match:
             continue
@@ -178,6 +187,9 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
         qty = _parse_number(match.group("qty"))
         if price is None or qty is None:
             continue
+        trade_key = (account_id, _normalize_symbol(code), trade_date, side, abs(qty), price)
+        if match.group("ref") in seen_trade_refs or trade_key in seen_trade_keys:
+            continue
         trades.append(
             Trade(
                 account_id=account_id,
@@ -192,19 +204,56 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
             )
         )
 
-    # 户口变动 - 现货存入（新股中签等同买入）
+    # 户口变动 - 现货存入（新股中签/配售等同买入）
     ipo_pattern = re.compile(
-        r"^(?P<ref>\d{8,})\s+(?P<settle>\d{4}-\d{2}-\d{2})\s+现货存入\s+"
+        r"^(?P<ref>[A-Z0-9]{8,})\s+(?P<settle>\d{4}-\d{2}-\d{2})"
+        r"(?:\s+\d{4}-\d{2}-\d{2})?\s+现货存入\s+"
         r"(?P<code>\d{4,5})\s+(?P<name>.+?)\s+.*?@(?P<price>[\d.]+)\s+"
         r"(?P<qty>[\d,]+)"
     )
     for line in account_lines:
         if "现货存入" not in line:
             continue
-        if "Successful IPO" not in line and "新股" not in line:
-            continue
         m = ipo_pattern.search(line)
         if not m:
+            # Try lines without explicit @price (use amount/qty)
+            base_match = re.match(
+                r"^(?P<ref>[A-Z0-9]{8,})\s+(?P<settle>\d{4}-\d{2}-\d{2})"
+                r"(?:\s+\d{4}-\d{2}-\d{2})?\s+现货存入\s+"
+                r"(?P<code>\d{4,5})\s+(?P<rest>.+)$",
+                line,
+            )
+            if not base_match:
+                continue
+            rest = base_match.group("rest")
+            nums = re.findall(r"[\d,]+(?:\.\d+)?", rest)
+            if len(nums) < 2:
+                continue
+            qty = _parse_number(nums[-2])
+            amount = _parse_number(nums[-1])
+            if not qty or not amount:
+                continue
+            price = amount / qty
+            trade_date = _parse_date(base_match.group("settle"))
+            if not trade_date:
+                continue
+            code = base_match.group("code")
+            name = rest
+            # Trim trailing qty/amount from name
+            name = re.sub(r"[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s*$", "", name).strip()
+            trades.append(
+                Trade(
+                    account_id=account_id,
+                    symbol=code,
+                    name=name,
+                    currency="HKD",
+                    trade_date=trade_date,
+                    side="BUY",
+                    qty=abs(qty),
+                    price=price,
+                    source=f"现货存入:{base_match.group('ref')}",
+                )
+            )
             continue
         trade_date = _parse_date(m.group("settle"))
         if not trade_date:
@@ -215,7 +264,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
         qty = _parse_number(m.group("qty"))
         if price is None or qty is None:
             continue
-        # Treat as HKD stock buy
+        # Treat as HKD stock buy (new IPO/placement/allotment)
         trades.append(
             Trade(
                 account_id=account_id,
