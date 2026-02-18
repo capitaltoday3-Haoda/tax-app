@@ -155,6 +155,32 @@ async def process(
             account_month_to_holdings.setdefault(account_id, {})[month] = holdings
         account_trades.setdefault(account_id, []).extend(trades)
 
+    # Deduplicate Huatai trades that appear in both 成交单据 and 户口变动
+    for account_id, trades in list(account_trades.items()):
+        by_ref: Dict[str, Trade] = {}
+        deduped: List[Trade] = []
+        for t in trades:
+            ref = None
+            if ":" in t.source:
+                ref = t.source.split(":", 1)[1]
+            if not ref or not ref.isdigit():
+                deduped.append(t)
+                continue
+            if ref not in by_ref:
+                by_ref[ref] = t
+                deduped.append(t)
+                continue
+            # Prefer 成交单据 over 户口变动
+            existing = by_ref[ref]
+            if existing.source.startswith("户口变动") and t.source.startswith("成交单据"):
+                by_ref[ref] = t
+                # replace in deduped list
+                for i, item in enumerate(deduped):
+                    if item is existing:
+                        deduped[i] = t
+                        break
+        account_trades[account_id] = deduped
+
     avg_costs = _parse_avg_costs(avg_costs_csv)
     rates = _parse_fx_rates(usd_rate, hkd_rate, sgd_rate)
 
