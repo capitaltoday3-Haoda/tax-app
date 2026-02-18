@@ -22,28 +22,29 @@ REPORT_STORE: Dict[str, str] = {}
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    defaults = {
+        "usd_rate": 7.0288,
+        "hkd_rate": 0.90322,
+        "sgd_rate": 5.4586,
+        "rate_date": "2025-12-31",
+    }
+    return templates.TemplateResponse("index.html", {"request": request, **defaults})
 
 
-def _parse_fx_rates(raw: str) -> Dict[str, float]:
+def _parse_fx_rates(usd_rate: str, hkd_rate: str, sgd_rate: str) -> Dict[str, float]:
     rates: Dict[str, float] = {}
-    if not raw:
-        return rates
-    parts = []
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts.extend([p.strip() for p in line.split(",") if p.strip()])
-    for part in parts:
-        if "=" not in part:
-            continue
-        cur, val = part.split("=", 1)
-        cur = cur.strip().upper()
-        try:
-            rates[cur] = float(val.strip())
-        except ValueError:
-            continue
+    try:
+        rates["USD"] = float(usd_rate)
+    except (TypeError, ValueError):
+        pass
+    try:
+        rates["HKD"] = float(hkd_rate)
+    except (TypeError, ValueError):
+        pass
+    try:
+        rates["SGD"] = float(sgd_rate)
+    except (TypeError, ValueError):
+        pass
     return rates
 
 
@@ -103,7 +104,9 @@ async def process(
     request: Request,
     statements: List[UploadFile] = File(...),
     avg_costs_csv: Optional[UploadFile] = File(None),
-    fx_rates: str = Form(""),
+    usd_rate: str = Form(""),
+    hkd_rate: str = Form(""),
+    sgd_rate: str = Form(""),
     tax_floor_zero: Optional[str] = Form(None),
     target_year: Optional[str] = Form(None),
 ):
@@ -153,7 +156,7 @@ async def process(
         account_trades.setdefault(account_id, []).extend(trades)
 
     avg_costs = _parse_avg_costs(avg_costs_csv)
-    rates = _parse_fx_rates(fx_rates)
+    rates = _parse_fx_rates(usd_rate, hkd_rate, sgd_rate)
 
     rows: List[SummaryRow] = []
     warnings: List[WarningRow] = []
@@ -167,10 +170,13 @@ async def process(
         initial_lots: Dict[str, List[Lot]] = {}
         cost_missing_symbols = set()
 
+        name_map: Dict[str, str] = {}
         for h in initial_holdings:
             if h.qty <= 0:
                 continue
             sym = _normalize_symbol(h.symbol)
+            if h.name:
+                name_map[sym] = h.name
             key = _key(sym, h.currency)
             cost = _cost_lookup(avg_costs, account_id, sym, h.currency)
             if cost is not None:
@@ -207,9 +213,12 @@ async def process(
             for t in trades:
                 if _normalize_symbol(t.symbol) == sym:
                     cur = t.currency
+                    if not name_map.get(sym) and t.name:
+                        name_map[sym] = t.name
                     break
             if cur is None:
                 cur = ""
+            symbol_name = name_map.get(sym, "")
             net = r.gain - r.loss
             tax_base = net
             tax_due = tax_base * 0.20
@@ -231,6 +240,7 @@ async def process(
                 SummaryRow(
                     account_id=account_id,
                     symbol=sym,
+                    symbol_name=symbol_name,
                     currency=cur,
                     gain=r.gain,
                     loss=r.loss,
@@ -245,6 +255,33 @@ async def process(
                 )
             )
 
+    totals = {
+        "gain": sum(r.gain for r in rows),
+        "loss": sum(r.loss for r in rows),
+        "net": sum(r.net for r in rows),
+        "tax_due": sum(r.tax_due for r in rows),
+        "net_cny": sum(r.net_cny or 0 for r in rows),
+        "tax_cny": sum(r.tax_cny or 0 for r in rows),
+    }
+    rows.append(
+        SummaryRow(
+            account_id="TOTAL",
+            symbol="",
+            symbol_name="汇总",
+            currency="",
+            gain=totals["gain"],
+            loss=totals["loss"],
+            net=totals["net"],
+            tax_base=totals["net"],
+            tax_due=totals["tax_due"],
+            fx_rate=None,
+            net_cny=totals["net_cny"],
+            tax_cny=totals["tax_cny"],
+            cost_missing=False,
+            cost_missing_reason=None,
+        )
+    )
+
     wb = build_workbook(rows, warnings)
     out_path = os.path.join(tmp_dir, f"tax_report_{year}.xlsx")
     wb.save(out_path)
@@ -252,7 +289,7 @@ async def process(
     token = uuid4().hex
     REPORT_STORE[token] = out_path
 
-    accounts = sorted({r.account_id for r in rows})
+    accounts = sorted({r.account_id for r in rows if r.account_id != "TOTAL"})
     return templates.TemplateResponse(
         "preview.html",
         {
@@ -262,6 +299,7 @@ async def process(
             "download_url": f"/download/{token}",
             "year": year,
             "accounts": accounts,
+            "totals": totals,
         },
     )
 

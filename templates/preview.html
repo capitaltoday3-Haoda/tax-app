@@ -14,6 +14,7 @@
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
     th { background: #f5f5f5; text-align: left; }
+    .total-row { background: #f0f7f2; font-weight: 600; }
     .warn { color: #b00020; font-size: 13px; }
   </style>
 </head>
@@ -37,6 +38,7 @@
         <tr>
           <th>Account</th>
           <th>Symbol</th>
+          <th>Name</th>
           <th>Currency</th>
           <th>Realized Gain</th>
           <th>Realized Loss</th>
@@ -51,9 +53,10 @@
       </thead>
       <tbody>
         {% for r in rows %}
-        <tr data-account="{{ r.account_id }}">
+        <tr data-account="{{ r.account_id }}" class="{{ 'total-row' if r.account_id == 'TOTAL' else '' }}">
           <td>{{ r.account_id }}</td>
           <td>{{ r.symbol }}</td>
+          <td>{{ r.symbol_name }}</td>
           <td>{{ r.currency }}</td>
           <td>{{ '%.2f'|format(r.gain) }}</td>
           <td>{{ '%.2f'|format(r.loss) }}</td>
@@ -83,6 +86,10 @@
     select.addEventListener("change", () => {
       const v = select.value;
       document.querySelectorAll("tr[data-account]").forEach((row) => {
+        if (row.classList.contains("total-row")) {
+          row.style.display = "";
+          return;
+        }
         row.style.display = v === "ALL" || row.dataset.account === v ? "" : "none";
       });
     });

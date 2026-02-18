@@ -10,6 +10,7 @@ import pdfplumber
 class Trade:
     account_id: str
     symbol: str
+    name: str | None
     currency: str
     trade_date: date
     side: str  # "BUY" or "SELL"
@@ -134,6 +135,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
             Trade(
                 account_id=account_id,
                 symbol=_normalize_symbol(code),
+                name=None,
                 currency=currency,
                 trade_date=settle,
                 side=side,
@@ -173,6 +175,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
             Trade(
                 account_id=account_id,
                 symbol=_normalize_symbol(code),
+                name=None,
                 currency=currency,
                 trade_date=trade_date,
                 side=side,
@@ -284,16 +287,19 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
 
     in_trades = False
     current_symbol = None
+    current_name = None
     current_side = None
     for line in lines:
         if "交易--股票和股票期權" in line or "交易--股票和股票期权" in line:
             in_trades = True
             current_symbol = None
+            current_name = None
             current_side = None
             continue
         if in_trades and "交易--基金" in line:
             in_trades = False
             current_symbol = None
+            current_name = None
             current_side = None
             continue
         if not in_trades:
@@ -303,11 +309,13 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
         if header_match:
             current_side = "BUY" if header_match.group(1) == "買入" else "SELL"
             current_symbol = header_match.group(2)
+            current_name = header_match.group(3).strip()
             continue
         header_partial = re.search(r"(買入|賣出|賣出平倉)\s+([A-Z0-9.]+)\(([^)]*)$", line)
         if header_partial:
             current_side = "BUY" if header_partial.group(1) == "買入" else "SELL"
             current_symbol = header_partial.group(2)
+            current_name = header_partial.group(3).strip()
             continue
 
         row_match = re.search(
@@ -329,6 +337,7 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
                     Trade(
                         account_id=account_id,
                         symbol=current_symbol,
+                        name=current_name,
                         currency=currency,
                         trade_date=trade_date,
                         side=current_side,

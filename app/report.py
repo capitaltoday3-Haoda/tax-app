@@ -8,6 +8,7 @@ from openpyxl import Workbook
 class SummaryRow:
     account_id: str
     symbol: str
+    symbol_name: str
     currency: str
     gain: float
     loss: float
@@ -39,6 +40,7 @@ def build_workbook(
         [
             "Account",
             "Symbol",
+            "Name",
             "Currency",
             "Realized Gain",
             "Realized Loss",
@@ -57,6 +59,7 @@ def build_workbook(
             [
                 r.account_id,
                 r.symbol,
+                r.symbol_name,
                 r.currency,
                 r.gain,
                 r.loss,

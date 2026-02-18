@@ -36,9 +36,19 @@
       <div class="note">CSV 格式：symbol,currency,avg_cost，例如：PDD,USD,85.5</div>
 
       <label>年末汇率（CNY）</label>
-      <textarea name="fx_rates" placeholder="USD=7.20
-HKD=0.92"></textarea>
-      <div class="note">按行或逗号分隔，格式：币种=汇率</div>
+      <div class="row">
+        <label>USD/CNY</label>
+        <input type="text" name="usd_rate" value="{{ usd_rate }}" />
+      </div>
+      <div class="row">
+        <label>HKD/CNY</label>
+        <input type="text" name="hkd_rate" value="{{ hkd_rate }}" />
+      </div>
+      <div class="row">
+        <label>SGD/CNY</label>
+        <input type="text" name="sgd_rate" value="{{ sgd_rate }}" />
+      </div>
+      <div class="note">默认值为 {{ rate_date }} 参考汇率，可自行修改</div>
 
       <label>目标年份</label>
       <input type="text" name="target_year" placeholder="例如：2025" />
