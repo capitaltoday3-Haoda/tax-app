@@ -8,6 +8,7 @@ import pdfplumber
 
 @dataclass
 class Trade:
+    account_id: str
     symbol: str
     currency: str
     trade_date: date
@@ -19,6 +20,7 @@ class Trade:
 
 @dataclass
 class Holding:
+    account_id: str
     symbol: str
     currency: str
     qty: float
@@ -39,9 +41,12 @@ def _parse_number(token: str) -> Optional[float]:
     return -val if neg else val
 
 
-def _parse_date(token: str) -> Optional[date]:
+def _parse_date(token: str, fmt: str = "%Y-%m-%d") -> Optional[date]:
     try:
-        y, m, d = token.split("-")
+        if fmt == "%Y/%m/%d":
+            y, m, d = token.split("/")
+        else:
+            y, m, d = token.split("-")
         return date(int(y), int(m), int(d))
     except Exception:
         return None
@@ -89,7 +94,16 @@ def _normalize_symbol(code: str) -> str:
     return sym.replace("*", "")
 
 
-def parse_trades(text: str) -> List[Trade]:
+def _huatai_account_id(text: str) -> str:
+    match = re.search(r"客户户口\s*:\s*(\d+)", text)
+    if match:
+        return f"HTSC-{match.group(1)}"
+    return "HTSC-UNKNOWN"
+
+
+def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[Holding], str]:
+    account_id = _huatai_account_id(text)
+    month = parse_statement_month(text)
     trades: List[Trade] = []
 
     # 成交单据
@@ -118,6 +132,7 @@ def parse_trades(text: str) -> List[Trade]:
             continue
         trades.append(
             Trade(
+                account_id=account_id,
                 symbol=_normalize_symbol(code),
                 currency=currency,
                 trade_date=settle,
@@ -156,6 +171,7 @@ def parse_trades(text: str) -> List[Trade]:
             continue
         trades.append(
             Trade(
+                account_id=account_id,
                 symbol=_normalize_symbol(code),
                 currency=currency,
                 trade_date=trade_date,
@@ -166,10 +182,6 @@ def parse_trades(text: str) -> List[Trade]:
             )
         )
 
-    return trades
-
-
-def parse_holdings(text: str) -> List[Holding]:
     holdings: List[Holding] = []
     section_lines = _extract_section_lines(text, "持货结存", ["股票借贷资料", "重要提示"])
     currency = None
@@ -206,15 +218,127 @@ def parse_holdings(text: str) -> List[Holding]:
         if net_qty is None:
             continue
         holdings.append(
-            Holding(symbol=code, currency=currency, qty=float(net_qty), name=name)
+            Holding(account_id=account_id, symbol=code, currency=currency, qty=float(net_qty), name=name)
         )
-    return holdings
+
+    return month, trades, holdings, account_id
 
 
-def parse_pdf(pdf_path: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[Holding]]:
+def _normalize_duplicated(text: str) -> str:
+    if not text:
+        return text
+    out = []
+    prev = ""
+    for ch in text:
+        if ch == prev and not ch.isdigit() and ch not in ".,-()/":
+            continue
+        out.append(ch)
+        prev = ch
+    return "".join(out)
+
+
+def _futu_account_id(text: str) -> str:
+    match = re.search(r"賬戶號碼[:：]?\s*(\d{6,})", text)
+    if match:
+        return f"FUTU-{match.group(1)}"
+    match = re.search(r"帳戶號碼[:：]?\s*(\d{6,})", text)
+    if match:
+        return f"FUTU-{match.group(1)}"
+    return "FUTU-UNKNOWN"
+
+
+def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[Holding], str]:
+    text = _normalize_duplicated(text)
+    account_id = _futu_account_id(text)
+
+    month = None
+    match = re.search(r"(\d{4})/(\d{2})", text)
+    if match:
+        month = (int(match.group(1)), int(match.group(2)))
+
+    trades: List[Trade] = []
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    in_trades = False
+    current_symbol = None
+    current_side = None
+    for line in lines:
+        if "交易--股票和股票期權" in line:
+            in_trades = True
+            current_symbol = None
+            current_side = None
+            continue
+        if in_trades and "交易--基金" in line:
+            in_trades = False
+            current_symbol = None
+            current_side = None
+            continue
+        if not in_trades:
+            continue
+
+        header_match = re.search(r"(買入|賣出|賣出平倉)\s+([A-Z0-9.]+)\(([^)]*)\)", line)
+        if header_match:
+            current_side = "BUY" if header_match.group(1) == "買入" else "SELL"
+            current_symbol = header_match.group(2)
+            continue
+
+        row_match = re.search(
+            r"(SEHK|US)\s+(HKD|USD|CNH|JPY|SGD)\s+"
+            r"(\d{4}/\d{2}/\d{2})\s+(\d{4}/\d{2}/\d{2})\s+"
+            r"([\d,]+)\s+([\d.]+)\s+([\d,]+(?:\.\d+)?)",
+            line,
+        )
+        if row_match and current_symbol and current_side:
+            trade_date = _parse_date(row_match.group(3), fmt="%Y/%m/%d")
+            qty = _parse_number(row_match.group(5))
+            price = _parse_number(row_match.group(6))
+            currency = row_match.group(2)
+            if trade_date and qty is not None and price is not None:
+                trades.append(
+                    Trade(
+                        account_id=account_id,
+                        symbol=current_symbol,
+                        currency=currency,
+                        trade_date=trade_date,
+                        side=current_side,
+                        qty=abs(qty),
+                        price=price,
+                        source=f"交易:{current_symbol}",
+                    )
+                )
+
+    holdings: List[Holding] = []
+    section_lines = _extract_section_lines(
+        text,
+        "期初概覽--股票和股票期權",
+        ["期初概覽--基金", "交易--股票和股票期權"],
+    )
+    for line in section_lines:
+        m = re.match(
+            r"^([A-Z0-9.]+)\(([^)]*)\)\s+(SEHK|US)\s+(HKD|USD|CNH|JPY|SGD)\s+"
+            r"([\d,]+)\s+([\d.]+)\s+-\s+([\d,]+(?:\.\d+)?)",
+            line,
+        )
+        if not m:
+            continue
+        symbol = m.group(1)
+        name = m.group(2)
+        currency = m.group(4)
+        qty = _parse_number(m.group(5))
+        if qty is None:
+            continue
+        holdings.append(
+            Holding(account_id=account_id, symbol=symbol, currency=currency, qty=float(qty), name=name)
+        )
+
+    return month, trades, holdings, account_id
+
+
+def parse_pdf(pdf_path: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[Holding], str]:
     pages = extract_text_pages(pdf_path)
     full_text = "\n".join(pages)
-    month = parse_statement_month(full_text)
-    trades = parse_trades(full_text)
-    holdings = parse_holdings(full_text)
-    return month, trades, holdings
+
+    if "保證金綜合帳戶" in full_text or "證券月結單" in full_text:
+        return parse_futu(full_text)
+
+    return parse_huatai(full_text)

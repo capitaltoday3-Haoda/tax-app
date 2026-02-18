@@ -6,6 +6,7 @@ from openpyxl import Workbook
 
 @dataclass
 class SummaryRow:
+    account_id: str
     symbol: str
     currency: str
     gain: float
@@ -22,6 +23,7 @@ class SummaryRow:
 
 @dataclass
 class WarningRow:
+    account_id: str
     symbol: str
     message: str
 
@@ -35,6 +37,7 @@ def build_workbook(
     ws.title = "Summary"
     ws.append(
         [
+            "Account",
             "Symbol",
             "Currency",
             "Realized Gain",
@@ -52,6 +55,7 @@ def build_workbook(
     for r in rows:
         ws.append(
             [
+                r.account_id,
                 r.symbol,
                 r.currency,
                 r.gain,
@@ -68,8 +72,8 @@ def build_workbook(
         )
 
     ws2 = wb.create_sheet("Warnings")
-    ws2.append(["Symbol", "Message"])
+    ws2.append(["Account", "Symbol", "Message"])
     for w in warnings:
-        ws2.append([w.symbol, w.message])
+        ws2.append([w.account_id, w.symbol, w.message])
 
     return wb

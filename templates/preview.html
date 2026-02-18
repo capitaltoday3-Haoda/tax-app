@@ -6,7 +6,7 @@
   <title>结果预览</title>
   <style>
     body { font-family: "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; margin: 32px; color: #1a1a1a; }
-    .container { max-width: 1000px; margin: 0 auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
     h1 { font-size: 22px; margin-bottom: 8px; }
     a.btn { display: inline-block; margin: 12px 0; background: #1f7a3f; color: #fff; text-decoration: none; padding: 10px 16px; border-radius: 6px; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -23,6 +23,7 @@
     <table>
       <thead>
         <tr>
+          <th>Account</th>
           <th>Symbol</th>
           <th>Currency</th>
           <th>Realized Gain</th>
@@ -39,6 +40,7 @@
       <tbody>
         {% for r in rows %}
         <tr>
+          <td>{{ r.account_id }}</td>
           <td>{{ r.symbol }}</td>
           <td>{{ r.currency }}</td>
           <td>{{ '%.2f'|format(r.gain) }}</td>
@@ -59,7 +61,7 @@
       <h2>Warnings</h2>
       <ul>
         {% for w in warnings %}
-          <li class="warn">{{ w.symbol }}: {{ w.message }}</li>
+          <li class="warn">{{ w.account_id }} {{ w.symbol }}: {{ w.message }}</li>
         {% endfor %}
       </ul>
     {% endif %}
