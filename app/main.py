@@ -171,12 +171,16 @@ async def process(
         cost_missing_symbols = set()
 
         name_map: Dict[str, str] = {}
+        for holdings in month_map.values():
+            for h in holdings:
+                sym = _normalize_symbol(h.symbol)
+                if h.name:
+                    name_map[sym] = h.name
+
         for h in initial_holdings:
             if h.qty <= 0:
                 continue
             sym = _normalize_symbol(h.symbol)
-            if h.name:
-                name_map[sym] = h.name
             key = _key(sym, h.currency)
             cost = _cost_lookup(avg_costs, account_id, sym, h.currency)
             if cost is not None:

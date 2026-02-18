@@ -151,7 +151,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
         r"^(?P<ref>\d{8,})\s+(?P<settle>\d{4}-\d{2}-\d{2})\s+"
         r"(?P<trade>\d{4}-\d{2}-\d{2})\s+买卖交易\s+"
         r"(?P<side>买入|沽出)\s+(?P<code>[A-Z0-9]+:(?:HK|US))\s+"
-        r".*?@(?P<price>[\d.]+)\s+(?P<qty>[\d,().-]+)"
+        r"(?P<name>.+?)\s+@(?P<price>[\d.]+)\s+(?P<qty>[\d,().-]+)"
     )
     for line in account_lines:
         if "买卖交易" not in line:
@@ -175,7 +175,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
             Trade(
                 account_id=account_id,
                 symbol=_normalize_symbol(code),
-                name=None,
+                name=match.group("name").strip() if match.group("name") else None,
                 currency=currency,
                 trade_date=trade_date,
                 side=side,
