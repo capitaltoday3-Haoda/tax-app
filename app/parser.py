@@ -128,7 +128,14 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
             continue
         if ":FUND" in code:
             continue
-        side = "BUY" if side_cn == "买入" else "SELL" if side_cn == "沽出" else None
+        side_map = {
+            "买入": "BUY",
+            "买入开仓": "BUY",
+            "卖出": "SELL",
+            "沽出": "SELL",
+            "卖出平仓": "SELL",
+        }
+        side = side_map.get(side_cn)
         if side is None:
             continue
         trades.append(
@@ -150,7 +157,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
     pattern = re.compile(
         r"^(?P<ref>\d{8,})\s+(?P<settle>\d{4}-\d{2}-\d{2})\s+"
         r"(?P<trade>\d{4}-\d{2}-\d{2})\s+买卖交易\s+"
-        r"(?P<side>买入|沽出)\s+(?P<code>[A-Z0-9]+:(?:HK|US))\s+"
+        r"(?P<side>买入|沽出|卖出平仓|买入开仓|卖出)\s+(?P<code>[A-Z0-9]+:(?:HK|US))\s+"
         r"(?P<name>.+?)\s+@(?P<price>[\d.]+)\s+(?P<qty>[\d,().-]+)"
     )
     for line in account_lines:
@@ -162,7 +169,7 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
         trade_date = _parse_date(match.group("trade"))
         if not trade_date:
             continue
-        side = "BUY" if match.group("side") == "买入" else "SELL"
+        side = "BUY" if match.group("side") in ("买入", "买入开仓") else "SELL"
         code = match.group("code")
         currency = _infer_currency_from_code(code)
         if currency is None:
