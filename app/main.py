@@ -181,7 +181,7 @@ async def process(
         net = r.gain - r.loss
         tax_base = net
         tax_due = tax_base * 0.20
-        tax_floor = str(tax_floor_zero).lower() in (\"true\", \"on\", \"1\", \"yes\")
+        tax_floor = str(tax_floor_zero).lower() in ("true", "on", "1", "yes")
         if tax_floor and tax_due < 0:
             tax_due = 0.0
         fx = rates.get(cur)
