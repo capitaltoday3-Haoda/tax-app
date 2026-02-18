@@ -199,7 +199,7 @@ async def process(
                 )
                 cost_missing_symbols.add(sym)
 
-        realized, fifo_warnings, fifo_missing = compute_realized(
+        realized, fifo_warnings, fifo_missing, sold_symbols = compute_realized(
             trades, initial_lots, fallback_costs, target_year=year
         )
         cost_missing_symbols.update(fifo_missing)
@@ -213,6 +213,8 @@ async def process(
             warning_map.setdefault(w.symbol, []).append(w.message)
 
         for sym, r in realized.items():
+            if sym not in sold_symbols:
+                continue
             cur = None
             for t in trades:
                 if _normalize_symbol(t.symbol) == sym:

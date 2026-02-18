@@ -34,11 +34,12 @@ def compute_realized(
     initial_lots: Dict[str, List[Lot]],
     fallback_costs: Dict[str, float],
     target_year: int | None = None,
-) -> Tuple[Dict[str, Realized], List[WarningMsg], Set[str]]:
+) -> Tuple[Dict[str, Realized], List[WarningMsg], Set[str], Set[str]]:
     positions: Dict[str, List[Lot]] = {sym: list(lots) for sym, lots in initial_lots.items()}
     realized: Dict[str, Realized] = {}
     warnings: List[WarningMsg] = []
     missing_cost_symbols: Set[str] = set()
+    sold_symbols: Set[str] = set()
 
     trades_sorted = sorted(trades, key=lambda t: t.trade_date)
     for trade in trades_sorted:
@@ -51,6 +52,9 @@ def compute_realized(
         if trade.side == "BUY":
             positions[sym].append(Lot(qty=trade.qty, cost=trade.price))
             continue
+
+        if target_year is None or trade.trade_date.year == target_year:
+            sold_symbols.add(sym)
 
         remaining = trade.qty
         lots = positions[sym]
@@ -82,4 +86,4 @@ def compute_realized(
                 _add_realized(realized[sym], (trade.price - fallback) * remaining)
             remaining = 0.0
 
-    return realized, warnings, missing_cost_symbols
+    return realized, warnings, missing_cost_symbols, sold_symbols
