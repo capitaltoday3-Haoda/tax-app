@@ -146,6 +146,7 @@ async def process(
     fallback_costs: Dict[str, float] = {}
     initial_lots: Dict[str, List[Lot]] = {}
     warnings: List[WarningRow] = []
+    cost_missing_symbols = set()
 
     for h in initial_holdings:
         if h.qty <= 0:
@@ -166,8 +167,12 @@ async def process(
                     ),
                 )
             )
+            cost_missing_symbols.add(sym)
 
-    realized, fifo_warnings = compute_realized(all_trades, initial_lots, fallback_costs, target_year=year)
+    realized, fifo_warnings, fifo_missing = compute_realized(
+        all_trades, initial_lots, fallback_costs, target_year=year
+    )
+    cost_missing_symbols.update(fifo_missing)
     for w in fifo_warnings:
         warnings.append(WarningRow(symbol=w.symbol, message=w.message))
 
@@ -208,6 +213,7 @@ async def process(
                 fx_rate=fx,
                 net_cny=net_cny,
                 tax_cny=tax_cny,
+                cost_missing=sym in cost_missing_symbols,
             )
         )
 

@@ -1,5 +1,5 @@
 ﻿from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from .parser import Trade
 
@@ -34,10 +34,11 @@ def compute_realized(
     initial_lots: Dict[str, List[Lot]],
     fallback_costs: Dict[str, float],
     target_year: int | None = None,
-) -> Tuple[Dict[str, Realized], List[WarningMsg]]:
+) -> Tuple[Dict[str, Realized], List[WarningMsg], Set[str]]:
     positions: Dict[str, List[Lot]] = {sym: list(lots) for sym, lots in initial_lots.items()}
     realized: Dict[str, Realized] = {}
     warnings: List[WarningMsg] = []
+    missing_cost_symbols: Set[str] = set()
 
     trades_sorted = sorted(trades, key=lambda t: t.trade_date)
     for trade in trades_sorted:
@@ -75,9 +76,10 @@ def compute_realized(
                         ),
                     )
                 )
+                missing_cost_symbols.add(sym)
                 fallback = 0.0
             if target_year is None or trade.trade_date.year == target_year:
                 _add_realized(realized[sym], (trade.price - fallback) * remaining)
             remaining = 0.0
 
-    return realized, warnings
+    return realized, warnings, missing_cost_symbols

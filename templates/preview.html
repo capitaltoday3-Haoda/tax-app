@@ -32,6 +32,7 @@
           <th>FX Rate</th>
           <th>Net (CNY)</th>
           <th>Tax Due (CNY)</th>
+          <th>Cost Missing</th>
         </tr>
       </thead>
       <tbody>
@@ -46,6 +47,7 @@
           <td>{{ r.fx_rate if r.fx_rate is not none else '' }}</td>
           <td>{{ '%.2f'|format(r.net_cny) if r.net_cny is not none else '' }}</td>
           <td>{{ '%.2f'|format(r.tax_cny) if r.tax_cny is not none else '' }}</td>
+          <td>{{ 'YES' if r.cost_missing else '' }}</td>
         </tr>
         {% endfor %}
       </tbody>
