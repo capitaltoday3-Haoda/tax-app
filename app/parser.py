@@ -237,6 +237,25 @@ def _normalize_duplicated(text: str) -> str:
     return "".join(out)
 
 
+def _merge_wrapped_lines(lines: List[str]) -> List[str]:
+    merged: List[str] = []
+    buffer = ""
+    for line in lines:
+        if buffer:
+            buffer = buffer + line
+            if buffer.count("(") <= buffer.count(")"):
+                merged.append(buffer)
+                buffer = ""
+            continue
+        if re.search(r"(買入|賣出|賣出平倉)\s+[A-Z0-9.]+\([^)]*$", line):
+            buffer = line
+            continue
+        merged.append(line)
+    if buffer:
+        merged.append(buffer)
+    return merged
+
+
 def _futu_account_id(text: str) -> str:
     match = re.search(r"賬戶號碼[:：]?\s*(\d{6,})", text)
     if match:
@@ -258,12 +277,13 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
 
     trades: List[Trade] = []
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    lines = _merge_wrapped_lines(lines)
 
     in_trades = False
     current_symbol = None
     current_side = None
     for line in lines:
-        if "交易--股票和股票期權" in line:
+        if "交易--股票和股票期權" in line or "交易--股票和股票期权" in line:
             in_trades = True
             current_symbol = None
             current_side = None
@@ -280,6 +300,11 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
         if header_match:
             current_side = "BUY" if header_match.group(1) == "買入" else "SELL"
             current_symbol = header_match.group(2)
+            continue
+        header_partial = re.search(r"(買入|賣出|賣出平倉)\s+([A-Z0-9.]+)\(([^)]*)$", line)
+        if header_partial:
+            current_side = "BUY" if header_partial.group(1) == "買入" else "SELL"
+            current_symbol = header_partial.group(2)
             continue
 
         row_match = re.search(
@@ -311,8 +336,14 @@ def parse_futu(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], List[
     section_lines = _extract_section_lines(
         text,
         "期初概覽--股票和股票期權",
-        ["期初概覽--基金", "交易--股票和股票期權"],
+        ["期初概覽--基金", "交易--股票和股票期權", "交易--股票和股票期权"],
     )
+    if not section_lines:
+        section_lines = _extract_section_lines(
+            text,
+            "期初概覽--股票和股票期权",
+            ["期初概覽--基金", "交易--股票和股票期權", "交易--股票和股票期权"],
+        )
     for line in section_lines:
         m = re.match(
             r"^([A-Z0-9.]+)\(([^)]*)\)\s+(SEHK|US)\s+(HKD|USD|CNH|JPY|SGD)\s+"
