@@ -33,6 +33,7 @@
           <th>Net (CNY)</th>
           <th>Tax Due (CNY)</th>
           <th>Cost Missing</th>
+          <th>Cost Missing Reason</th>
         </tr>
       </thead>
       <tbody>
@@ -48,6 +49,7 @@
           <td>{{ '%.2f'|format(r.net_cny) if r.net_cny is not none else '' }}</td>
           <td>{{ '%.2f'|format(r.tax_cny) if r.tax_cny is not none else '' }}</td>
           <td>{{ 'YES' if r.cost_missing else '' }}</td>
+          <td>{{ r.cost_missing_reason or '' }}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -178,6 +178,10 @@ async def process(
 
     rates = _parse_fx_rates(fx_rates)
 
+    warning_map: Dict[str, List[str]] = {}
+    for w in warnings:
+        warning_map.setdefault(w.symbol, []).append(w.message)
+
     rows: List[SummaryRow] = []
     for sym, r in realized.items():
         # Determine currency from trades
@@ -214,6 +218,7 @@ async def process(
                 net_cny=net_cny,
                 tax_cny=tax_cny,
                 cost_missing=sym in cost_missing_symbols,
+                cost_missing_reason="; ".join(warning_map.get(sym, [])) or None,
             )
         )
 

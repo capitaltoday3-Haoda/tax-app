@@ -17,6 +17,7 @@ class SummaryRow:
     net_cny: Optional[float]
     tax_cny: Optional[float]
     cost_missing: bool
+    cost_missing_reason: Optional[str]
 
 
 @dataclass
@@ -45,6 +46,7 @@ def build_workbook(
             "Net (CNY)",
             "Tax Due (CNY)",
             "Cost Missing",
+            "Cost Missing Reason",
         ]
     )
     for r in rows:
@@ -61,6 +63,7 @@ def build_workbook(
                 r.net_cny,
                 r.tax_cny,
                 "YES" if r.cost_missing else "",
+                r.cost_missing_reason or "",
             ]
         )
 
