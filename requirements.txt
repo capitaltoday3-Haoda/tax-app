@@ -1,0 +1,6 @@
+﻿fastapi
+uvicorn
+pdfplumber
+pypdf
+openpyxl
+jinja2

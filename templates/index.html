@@ -1,0 +1,52 @@
+﻿<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>海外投资收入税务计算</title>
+  <style>
+    body { font-family: "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; margin: 32px; color: #1a1a1a; }
+    .container { max-width: 860px; margin: 0 auto; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    p { color: #444; }
+    label { display: block; margin: 16px 0 6px; font-weight: 600; }
+    input[type="file"], textarea, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
+    textarea { min-height: 120px; }
+    .row { margin-bottom: 12px; }
+    .btn { margin-top: 16px; background: #1f7a3f; color: #fff; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+    .note { font-size: 13px; color: #555; }
+    .error { color: #b00020; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>海外投资收入税务计算</h1>
+    <p>上传月结单 PDF，系统会按 FIFO 计算 realized gain/loss，并输出 Excel。</p>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/process" enctype="multipart/form-data">
+      <label>月结单 PDF（可多选）</label>
+      <input type="file" name="statements" multiple accept="application/pdf" required />
+
+      <label>年初平均成本 CSV（可选）</label>
+      <input type="file" name="avg_costs_csv" accept="text/csv" />
+      <div class="note">CSV 格式：symbol,currency,avg_cost，例如：PDD,USD,85.5</div>
+
+      <label>年末汇率（CNY）</label>
+      <textarea name="fx_rates" placeholder="USD=7.20
+HKD=0.92"></textarea>
+      <div class="note">按行或逗号分隔，格式：币种=汇率</div>
+
+      <label>税额下限</label>
+      <div class="note">
+        <input type="checkbox" name="tax_floor_zero" value="true" /> 若为负数，税额按 0 处理
+      </div>
+
+      <button class="btn" type="submit">生成 Excel</button>
+    </form>
+  </div>
+</body>
+</html>
