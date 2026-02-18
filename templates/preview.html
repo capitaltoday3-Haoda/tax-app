@@ -1,0 +1,64 @@
+﻿<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>结果预览</title>
+  <style>
+    body { font-family: "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; margin: 32px; color: #1a1a1a; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    a.btn { display: inline-block; margin: 12px 0; background: #1f7a3f; color: #fff; text-decoration: none; padding: 10px 16px; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+    th { background: #f5f5f5; text-align: left; }
+    .warn { color: #b00020; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>{{ year }} 年度汇总预览</h1>
+    <a class="btn" href="{{ download_url }}">下载 Excel</a>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Currency</th>
+          <th>Realized Gain</th>
+          <th>Realized Loss</th>
+          <th>Net</th>
+          <th>Tax Due (20%)</th>
+          <th>FX Rate</th>
+          <th>Net (CNY)</th>
+          <th>Tax Due (CNY)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.symbol }}</td>
+          <td>{{ r.currency }}</td>
+          <td>{{ '%.2f'|format(r.gain) }}</td>
+          <td>{{ '%.2f'|format(r.loss) }}</td>
+          <td>{{ '%.2f'|format(r.net) }}</td>
+          <td>{{ '%.2f'|format(r.tax_due) }}</td>
+          <td>{{ r.fx_rate if r.fx_rate is not none else '' }}</td>
+          <td>{{ '%.2f'|format(r.net_cny) if r.net_cny is not none else '' }}</td>
+          <td>{{ '%.2f'|format(r.tax_cny) if r.tax_cny is not none else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if warnings %}
+      <h2>Warnings</h2>
+      <ul>
+        {% for w in warnings %}
+          <li class="warn">{{ w.symbol }}: {{ w.message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</body>
+</html>

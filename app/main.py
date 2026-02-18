@@ -3,6 +3,7 @@ import io
 import os
 import tempfile
 from typing import Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -16,6 +17,7 @@ from .report import SummaryRow, WarningRow, build_workbook
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+REPORT_STORE: Dict[str, str] = {}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -210,8 +212,28 @@ async def process(
     out_path = os.path.join(tmp_dir, f"tax_report_{year}.xlsx")
     wb.save(out_path)
 
+    token = uuid4().hex
+    REPORT_STORE[token] = out_path
+
+    return templates.TemplateResponse(
+        "preview.html",
+        {
+            "request": request,
+            "rows": rows,
+            "warnings": warnings,
+            "download_url": f"/download/{token}",
+            "year": year,
+        },
+    )
+
+
+@app.get("/download/{token}")
+def download(token: str):
+    path = REPORT_STORE.get(token)
+    if not path or not os.path.exists(path):
+        return HTMLResponse("文件不存在或已过期。", status_code=404)
     return FileResponse(
-        out_path,
+        path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename=os.path.basename(out_path),
+        filename=os.path.basename(path),
     )
