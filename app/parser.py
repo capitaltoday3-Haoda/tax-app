@@ -192,6 +192,44 @@ def parse_huatai(text: str) -> Tuple[Optional[Tuple[int, int]], List[Trade], Lis
             )
         )
 
+    # 户口变动 - 现货存入（新股中签等同买入）
+    ipo_pattern = re.compile(
+        r"^(?P<ref>\d{8,})\s+(?P<settle>\d{4}-\d{2}-\d{2})\s+现货存入\s+"
+        r"(?P<code>\d{4,5})\s+(?P<name>.+?)\s+.*?@(?P<price>[\d.]+)\s+"
+        r"(?P<qty>[\d,]+)"
+    )
+    for line in account_lines:
+        if "现货存入" not in line:
+            continue
+        if "Successful IPO" not in line and "新股" not in line:
+            continue
+        m = ipo_pattern.search(line)
+        if not m:
+            continue
+        trade_date = _parse_date(m.group("settle"))
+        if not trade_date:
+            continue
+        code = m.group("code")
+        name = m.group("name").strip()
+        price = _parse_number(m.group("price"))
+        qty = _parse_number(m.group("qty"))
+        if price is None or qty is None:
+            continue
+        # Treat as HKD stock buy
+        trades.append(
+            Trade(
+                account_id=account_id,
+                symbol=code,
+                name=name,
+                currency="HKD",
+                trade_date=trade_date,
+                side="BUY",
+                qty=abs(qty),
+                price=price,
+                source=f"现货存入:{m.group('ref')}",
+            )
+        )
+
     holdings: List[Holding] = []
     section_lines = _extract_section_lines(text, "持货结存", ["股票借贷资料", "重要提示"])
     currency = None
